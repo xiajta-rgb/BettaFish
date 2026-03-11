@@ -12,8 +12,16 @@ from __future__ import annotations
 
 import asyncio
 import os
+import sys
 from typing import Optional
 from urllib.parse import quote_plus
+
+# 添加 venv 路径，确保能找到依赖
+app_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+venv_path = os.path.join(app_root, "venv")
+if venv_path not in sys.path:
+    sys.path.insert(0, venv_path)
+
 from loguru import logger
 
 from sqlalchemy.ext.asyncio import create_async_engine
@@ -24,7 +32,6 @@ from models_sa import Base
 # 导入 models_bigdata 以确保所有表类被注册到 Base.metadata
 # models_bigdata 现在也使用 models_sa 的 Base，所以所有表都在同一个 metadata 中
 import models_bigdata  # noqa: F401  # 导入以注册所有表类
-import sys
 from pathlib import Path
 
 # 添加项目根目录到路径
@@ -39,18 +46,25 @@ def _env(key: str, default: Optional[str] = None) -> Optional[str]:
 
 
 def _build_database_url() -> str:
-    # 优先 DATABASE_URL
     database_url = settings.DATABASE_URL if hasattr(settings, "DATABASE_URL") else None
     if database_url:
         return database_url
 
-    dialect = (settings.DB_DIALECT or "mysql").lower()
+    dialect = (settings.DB_DIALECT or "sqlite").lower()
     host = settings.DB_HOST or "localhost"
     port = str(settings.DB_PORT or ("3306" if dialect == "mysql" else "5432"))
     user = settings.DB_USER or "root"
     password = settings.DB_PASSWORD or ""
     password = quote_plus(password)
     db_name = settings.DB_NAME or "mindspider"
+
+    if dialect == "sqlite":
+        import os
+        db_path = db_name if db_name else "bettafish.db"
+        if not os.path.isabs(db_path):
+            app_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            db_path = os.path.join(app_root, db_path)
+        return f"sqlite+aiosqlite:///{db_path}"
 
     if dialect in ("postgresql", "postgres"):
         return f"postgresql+asyncpg://{user}:{password}@{host}:{port}/{db_name}"
@@ -59,6 +73,11 @@ def _build_database_url() -> str:
 
 
 async def _create_views_if_needed(engine_dialect: str):
+    # SQLite 不支持 CREATE OR REPLACE VIEW，跳过视图创建
+    if engine_dialect == "sqlite":
+        logger.info("SQLite 数据库，跳过视图创建")
+        return
+    
     # 视图为可选；仅当业务需要时创建。两端使用通用 SQL 聚合避免方言函数。
     # 如不需要视图，可跳过。
     engine_dialect = engine_dialect.lower()

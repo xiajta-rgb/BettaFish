@@ -35,13 +35,18 @@ class DatabaseManager:
     def connect(self):
         """连接数据库"""
         try:
-            dialect = (settings.DB_DIALECT or "mysql").lower()
-            if dialect in ("postgresql", "postgres"):
+            dialect = (settings.DB_DIALECT or "sqlite").lower()
+            
+            if dialect == "sqlite":
+                db_path = settings.DB_NAME if settings.DB_NAME else "bettafish.db"
+                url = f"sqlite:///{db_path}"
+            elif dialect in ("postgresql", "postgres"):
                 url = f"postgresql+psycopg://{settings.DB_USER}:{quote_plus(settings.DB_PASSWORD)}@{settings.DB_HOST}:{settings.DB_PORT}/{settings.DB_NAME}"
             else:
                 url = f"mysql+pymysql://{settings.DB_USER}:{quote_plus(settings.DB_PASSWORD)}@{settings.DB_HOST}:{settings.DB_PORT}/{settings.DB_NAME}?charset={settings.DB_CHARSET}"
+            
             self.engine = create_engine(url, future=True)
-            logger.info(f"成功连接到数据库: {settings.DB_NAME}")
+            logger.info(f"成功连接到数据库: {settings.DB_NAME if dialect != 'sqlite' else db_path}")
         except Exception as e:
             logger.error(f"数据库连接失败: {e}")
             sys.exit(1)

@@ -40,25 +40,48 @@ class PlatformCrawler:
         logger.info(f"初始化平台爬虫管理器，MediaCrawler路径: {self.mediacrawler_path}")
     
     def configure_mediacrawler_db(self):
-        """配置MediaCrawler使用我们的数据库（MySQL或PostgreSQL）"""
+        """配置MediaCrawler使用我们的数据库（MySQL、PostgreSQL或SQLite）"""
         try:
-            # 判断数据库类型
-            db_dialect = (config.settings.DB_DIALECT or "mysql").lower()
+            db_dialect = (config.settings.DB_DIALECT or "sqlite").lower()
+            is_sqlite = db_dialect == "sqlite"
             is_postgresql = db_dialect in ("postgresql", "postgres")
             
-            # 修改MediaCrawler的数据库配置
             db_config_path = self.mediacrawler_path / "config" / "db_config.py"
             
-            # 读取原始配置
             with open(db_config_path, 'r', encoding='utf-8') as f:
                 content = f.read()
             
-            # PostgreSQL配置值：如果使用PostgreSQL则使用MindSpider配置，否则使用默认值或环境变量
-            pg_password = config.settings.DB_PASSWORD if is_postgresql else "bettafish"
-            pg_user = config.settings.DB_USER if is_postgresql else "bettafish"
-            pg_host = config.settings.DB_HOST if is_postgresql else "127.0.0.1"
-            pg_port = config.settings.DB_PORT if is_postgresql else 5444
-            pg_db_name = config.settings.DB_NAME if is_postgresql else "bettafish"
+            if is_sqlite:
+                db_path = config.settings.DB_NAME if config.settings.DB_NAME else "bettafish.db"
+                new_config = f'''# 声明：本代码仅供学习和研究目的使用。使用者应遵守以下原则：
+# 1. 不得用于任何商业用途。
+# 2. 使用时应遵守目标平台的使用条款和robots.txt规则。
+# 3. 不得进行大规模爬取或对平台造成运营干扰。
+# 4. 应合理控制请求频率，避免给目标平台带来不必要的负担。
+# 5. 不得用于任何非法或不当的用途。
+#
+# 详细许可条款请参阅项目根目录下的LICENSE文件。
+# 使用本代码即表示您同意遵守上述原则和LICENSE中的所有条款。
+
+
+import os
+
+# 使用SQLite数据库
+SQLITE_DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "{db_path}")
+
+sqlite_db_config = {{
+    "db_path": SQLITE_DB_PATH
+}}
+
+mysql_db_config = sqlite_db_config
+postgresql_db_config = sqlite_db_config
+'''
+            else:
+                pg_password = config.settings.DB_PASSWORD if is_postgresql else "bettafish"
+                pg_user = config.settings.DB_USER if is_postgresql else "bettafish"
+                pg_host = config.settings.DB_HOST if is_postgresql else "127.0.0.1"
+                pg_port = config.settings.DB_PORT if is_postgresql else 5444
+                pg_db_name = config.settings.DB_NAME if is_postgresql else "bettafish"
             
             # 替换数据库配置 - 使用MindSpider的数据库配置
             new_config = f'''# 声明：本代码仅供学习和研究目的使用。使用者应遵守以下原则：  

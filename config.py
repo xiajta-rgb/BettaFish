@@ -30,7 +30,7 @@ class Settings(BaseSettings):
     PORT: int = Field(5000, description="Flask服务器端口号，默认5000")
 
     # ====================== 数据库配置 ======================
-    DB_DIALECT: str = Field("postgresql", description="数据库类型，可选 mysql 或 postgresql；请与其他连接信息同时配置")
+    DB_DIALECT: str = Field("sqlite", description="数据库类型，可选 mysql、postgresql 或 sqlite")
     DB_HOST: str = Field("your_db_host", description="数据库主机，例如localhost 或 127.0.0.1")
     DB_PORT: int = Field(3306, description="数据库端口号，默认为3306")
     DB_USER: str = Field("your_db_user", description="数据库用户名")

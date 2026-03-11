@@ -5,10 +5,25 @@ Flask主应用 - 统一管理三个Streamlit应用
 import os
 import sys
 
-# 【修复】尽早设置环境变量，确保所有模块都使用无缓冲模式
+# 【修复】尽早设置环境变量
 os.environ['PYTHONIOENCODING'] = 'utf-8'
 os.environ['PYTHONUTF8'] = '1'
-os.environ['PYTHONUNBUFFERED'] = '1'  # 禁用Python输出缓冲，确保日志实时输出
+os.environ['PYTHONUNBUFFERED'] = '1'
+
+# 【关键】必须最先设置 PYTHONPATH，确保所有模块能找到 venv 中的依赖
+venv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "venv")
+
+# 添加 venv 根目录（loguru 等可能直接安装在这里）
+if venv_path not in sys.path:
+    sys.path.insert(0, venv_path)
+
+# 也尝试标准的 Lib/site-packages
+venv_site_packages = os.path.join(venv_path, "Lib", "site-packages")
+if os.path.exists(venv_site_packages) and venv_site_packages not in sys.path:
+    sys.path.insert(0, venv_site_packages)
+
+print(f"[DEBUG] Using venv_path: {venv_path}")
+print(f"[DEBUG] sys.path: {sys.path[:3]}")
 
 import subprocess
 import time
@@ -637,41 +652,48 @@ def start_streamlit_app(app_name, script_path, port):
         if processes[app_name]['process'] is not None:
             return False, "应用已经在运行"
         
-        # 检查文件是否存在
         if not os.path.exists(script_path):
             return False, f"文件不存在: {script_path}"
         
-        # 清空之前的日志文件
         log_file_path = LOG_DIR / f"{app_name}.log"
         if log_file_path.exists():
             log_file_path.unlink()
         
-        # 创建启动日志
         start_msg = f"[{datetime.now().strftime('%H:%M:%S')}] 启动 {app_name} 应用..."
         write_log_to_file(app_name, start_msg)
         
+        venv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "venv")
+        
+        system_python = r"c:\Users\xmls\AppData\Local\Python\pythoncore-3.14-64\python.exe"
+        
         cmd = [
-            sys.executable, '-m', 'streamlit', 'run',
+            system_python, '-m', 'streamlit', 'run',
             script_path,
             '--server.port', str(port),
             '--server.headless', 'true',
             '--browser.gatherUsageStats', 'false',
-            # '--logger.level', 'debug',  # 增加日志详细程度
             '--logger.level', 'info',
             '--server.enableCORS', 'false'
         ]
         
-        # 设置环境变量确保UTF-8编码和减少缓冲
         env = os.environ.copy()
+        # 添加多个可能的路径
+        python_paths = [
+            venv_path,
+            system_site,
+            r"c:\Users\xmls\AppData\Roaming\Python\Python314\site-packages",
+            r"c:\Users\xmls\AppData\Local\Programs\Python\Python314\Lib\site-packages",
+            r"c:\Users\xmls\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages",
+        ]
+        env['PYTHONPATH'] = ";".join(python_paths)
+        # 确保系统Python能使用用户包
+        env['PYTHONUSERPROFILE'] = r"c:\Users\xmls"
         env.update({
             'PYTHONIOENCODING': 'utf-8',
             'PYTHONUTF8': '1',
-            'LANG': 'en_US.UTF-8',
-            'LC_ALL': 'en_US.UTF-8',
-            'PYTHONUNBUFFERED': '1',  # 禁用Python缓冲
+            'PYTHONUNBUFFERED': '1',
             'STREAMLIT_BROWSER_GATHER_USAGE_STATS': 'false'
         })
-        
         # 使用当前工作目录而不是脚本目录
         process = subprocess.Popen(
             cmd,

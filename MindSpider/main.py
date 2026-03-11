@@ -7,6 +7,13 @@ MindSpider - AI爬虫项目主程序
 
 import os
 import sys
+
+# 添加 venv 路径，确保能找到依赖
+app_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+venv_path = os.path.join(app_root, "venv")
+if venv_path not in sys.path:
+    sys.path.insert(0, venv_path)
+
 import argparse
 from datetime import date, datetime
 from pathlib import Path
@@ -72,10 +79,12 @@ class MindSpider:
         logger.info("检查数据库连接...")
         
         def build_async_url() -> str:
-            dialect = (settings.DB_DIALECT or "mysql").lower()
+            dialect = (settings.DB_DIALECT or "sqlite").lower()
+            if dialect == "sqlite":
+                db_path = settings.DB_NAME if settings.DB_NAME else "bettafish.db"
+                return f"sqlite+aiosqlite:///{db_path}"
             if dialect == "postgresql":
                 return f"postgresql+asyncpg://{settings.DB_USER}:{quote_plus(settings.DB_PASSWORD)}@{settings.DB_HOST}:{settings.DB_PORT}/{settings.DB_NAME}"
-            # 默认使用 mysql 异步驱动 asyncmy
             return (
                 f"mysql+asyncmy://{settings.DB_USER}:{quote_plus(settings.DB_PASSWORD)}"
                 f"@{settings.DB_HOST}:{settings.DB_PORT}/{settings.DB_NAME}?charset={settings.DB_CHARSET}"
@@ -103,7 +112,10 @@ class MindSpider:
         logger.info("检查数据库表...")
         
         def build_async_url() -> str:
-            dialect = (settings.DB_DIALECT or "mysql").lower()
+            dialect = (settings.DB_DIALECT or "sqlite").lower()
+            if dialect == "sqlite":
+                db_path = settings.DB_NAME if settings.DB_NAME else "bettafish.db"
+                return f"sqlite+aiosqlite:///{db_path}"
             if dialect == "postgresql":
                 return f"postgresql+asyncpg://{settings.DB_USER}:{quote_plus(settings.DB_PASSWORD)}@{settings.DB_HOST}:{settings.DB_PORT}/{settings.DB_NAME}"
             return (
@@ -147,11 +159,20 @@ class MindSpider:
                 logger.error("错误：找不到数据库初始化脚本")
                 return False
             
+            # 使用系统 Python + PYTHONPATH 环境变量
+            app_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            venv_path = os.path.join(app_root, "venv")
+            
+            env = os.environ.copy()
+            env['PYTHONPATH'] = venv_path
+            
             result = subprocess.run(
                 [sys.executable, str(init_script)],
                 cwd=self.schema_path,
                 capture_output=True,
-                text=True
+                text=True,
+                env=env,
+                timeout=60
             )
             
             if result.returncode == 0:

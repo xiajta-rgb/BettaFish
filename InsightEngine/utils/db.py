@@ -26,7 +26,7 @@ _engine: Optional[AsyncEngine] = None
 
 
 def _build_database_url() -> str:
-    dialect: str = (settings.DB_DIALECT or "mysql").lower()
+    dialect: str = (settings.DB_DIALECT or "sqlite").lower()
     host: str = settings.DB_HOST or ""
     port: str = str(settings.DB_PORT or "")
     user: str = settings.DB_USER or ""
@@ -34,15 +34,17 @@ def _build_database_url() -> str:
     db_name: str = settings.DB_NAME or ""
 
     if os.getenv("DATABASE_URL"):
-        return os.getenv("DATABASE_URL")  # 直接使用外部提供的完整URL
+        return os.getenv("DATABASE_URL")
 
     password = quote_plus(password)
 
+    if dialect == "sqlite":
+        db_path = db_name if db_name else "bettafish.db"
+        return f"sqlite+aiosqlite:///{db_path}"
+
     if dialect in ("postgresql", "postgres"):
-        # PostgreSQL 使用 asyncpg 驱动
         return f"postgresql+asyncpg://{user}:{password}@{host}:{port}/{db_name}"
 
-    # 默认 MySQL 使用 aiomysql 驱动
     return f"mysql+aiomysql://{user}:{password}@{host}:{port}/{db_name}"
 
 
